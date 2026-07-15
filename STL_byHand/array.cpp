@@ -20,7 +20,9 @@ public:
     }
 
     MyArray(MyArray&& other) noexcept {
-        std::move(other.data, other.data + N, data);
+        for (size_t i = 0; i < N; ++i) {
+        data[i] = std::move(other.data[i]);  
+        }
     }
 
     MyArray& operator=(const MyArray& other) {
@@ -32,7 +34,9 @@ public:
 
     MyArray& operator=(MyArray&& other) noexcept {
         if (this != &other) {
-            std::move(other.data, other.data + N, data);
+            for (size_t i = 0; i < N; ++i) {
+                data[i] = std::move(other.data[i]);
+            }
         }
         return *this;
     }
@@ -74,6 +78,7 @@ public:
         for (std::size_t i = 0; i < N; ++i) data[i] = val;
     }
 
+    // ---- 交换 ----
     void swap(MyArray& other) {
         for (std::size_t i = 0; i < N; ++i) {
             T tmp = data[i];
