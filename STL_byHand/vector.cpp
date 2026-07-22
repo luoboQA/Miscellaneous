@@ -189,6 +189,8 @@ public:
      * 3. 在 pos 位置构造新元素
      */
     void insert(T* pos, const T& val) {
+        
+
         // 如果容量不足，先扩容
         if (_finish == _end_of_storage) {
             std::size_t new_cap = empty() ? 1 : capacity() * 2;
