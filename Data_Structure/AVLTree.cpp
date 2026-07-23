@@ -40,6 +40,13 @@ int BalanceFactor(AVLTree T) {
 }
 
 // 左旋（LL旋转）
+// 旋转前：
+//        T                      y
+//       / \                    / \
+//      A   y        ->        T   C
+//         / \                / \
+//        B   C              A   B
+
 AVLTree LeftRotate(AVLTree T) {
     AVLNode *y = T->rchild;
     T->rchild = y->lchild;
