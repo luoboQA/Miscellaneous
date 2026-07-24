@@ -161,6 +161,7 @@ GList1 CreateSimpleGList1() {
     return list;
 }
 
+
 int main() {
     printf("========================================\n");
     printf("    广义表-扩展线性链表存储表示\n");
@@ -199,10 +200,12 @@ int main() {
     
     printf("\n");
     printf("【两种存储结构对比】\n");
-    printf("头尾链表：hp指向表头，tp指向表尾（递归嵌套）\n");
-    printf("扩展线性链表：hp指向子表，tp指向下一个兄弟结点\n");
+    printf("广义表头尾链表：hp指向表头，tp指向表尾（递归嵌套）\n");
+    printf("广义表扩展线性链表：hp指向子表，tp指向下一个兄弟结点\n");
     printf("扩展线性链表更适合遍历和操作\n");
     
+
+
     getchar();
     return 0;
 }

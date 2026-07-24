@@ -26,7 +26,7 @@ typedef struct {
 
 // 哈希表每次重建增长后的大小
 int hashsize[] = { 11, 31, 61, 127, 251, 503 };
-int index = 0;
+int hashIndex = 0;
 
 // 初始哈希表
 Status InitHashTable(HashTable &H, int size) {
@@ -92,13 +92,17 @@ Status recreateHash(HashTable &H) {
 	otag = H.tag;
 	osize = H.size;
 
-	InitHashTable(H, hashsize[index++]);
+	InitHashTable(H, hashsize[hashIndex++]);
 	//把所有元素，按照新哈希函数放到新表中
 	for (i = 0; i < osize; i++) {
 		if (1 == otag[i]) {
 			InsertHash(H, orcd[i].key);
 		}
 	}
+
+	free(orcd);
+    free(otag);
+	
 	return OK;
 }
 
@@ -141,7 +145,7 @@ int main()
 
 	//初始化哈希表
 	printf("初始化哈希表\n");
-	if (SUCCESS == InitHashTable(H, hashsize[index++])) printf("初始化成功\n");
+	if (SUCCESS == InitHashTable(H, hashsize[hashIndex++])) printf("初始化成功\n");
 
 	//插入哈希表
 	printf("插入哈希表\n");

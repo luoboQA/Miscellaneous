@@ -12,11 +12,19 @@ using namespace std;
 
 typedef int Status;
 
+/*
+HT数组（n=5，m=9）:
+下标:    0    1    2    3    4    5    6    7    8    9
+      [未用] [A]  [B]  [C]  [D]  [E]  [F]  [G]  [H]  [I]
+      [权值] [5]  [4]  [3]  [2]  [1]  [3]  [6]  [10] [15]
+*/
+
 // ========== 哈夫曼树的存储结构 ==========
 
 typedef struct {
     unsigned int weight;
     unsigned int parent, lchild, rchild;
+    char ch;  // 存储字符，用于解码
 } HTNode, *HuffmanTree;
 
 typedef char **HuffmanCode;  // 动态分配数组存储哈夫曼编码表
@@ -45,31 +53,34 @@ void Select(HuffmanTree HT, int n, int &s1, int &s2) {
 
 // ========== 构建哈夫曼树 ==========
 
-void HuffmanCoding(HuffmanTree &HT, HuffmanCode &HC, int *w, int n) {
+void HuffmanCoding(HuffmanTree &HT, HuffmanCode &HC, int *w, char *chars, int n) {
     if (n <= 1) return;
     
-    int m = 2 * n - 1;
+    int m = 2 * n - 1; // 哈夫曼树的结点总数,n是叶子结点数
     HT = (HuffmanTree)malloc((m + 1) * sizeof(HTNode));
     
-    // 初始化
+    // 初始化叶子节点
     int i;
     for (i = 1; i <= n; i++) {
         HT[i].weight = w[i];
         HT[i].parent = 0;
         HT[i].lchild = 0;
         HT[i].rchild = 0;
+        HT[i].ch = chars[i];  // 新增：存储字符
     }
+    // 初始化非叶子节点
     for (i = n + 1; i <= m; i++) {
         HT[i].weight = 0;
         HT[i].parent = 0;
         HT[i].lchild = 0;
         HT[i].rchild = 0;
+        HT[i].ch = '\0';  // 新增：内部结点无字符
     }
     
     // 构造哈夫曼树
     for (i = n + 1; i <= m; i++) {
         int s1, s2;
-        Select(HT, i - 1, s1, s2);
+        Select(HT, i - 1, s1, s2); // 选两个最小的结点
         HT[s1].parent = i;
         HT[s2].parent = i;
         HT[i].lchild = s1;
@@ -106,10 +117,11 @@ void HuffmanCoding(HuffmanTree &HT, HuffmanCode &HC, int *w, int n) {
 
 void PrintHuffmanTree(HuffmanTree HT, int n) {
     int m = 2 * n - 1;
-    printf("结点\t权值\t父结点\t左孩子\t右孩子\n");
+    printf("结点\t权值\t字符\t父结点\t左孩子\t右孩子\n");
     for (int i = 1; i <= m; i++) {
-        printf("%d\t%d\t%d\t%d\t%d\n", 
-               i, HT[i].weight, HT[i].parent, HT[i].lchild, HT[i].rchild);
+        char ch = HT[i].ch ? HT[i].ch : '-';
+        printf("%d\t%d\t%c\t%d\t%d\t%d\n", 
+               i, HT[i].weight, ch, HT[i].parent, HT[i].lchild, HT[i].rchild);
     }
 }
 
@@ -151,7 +163,7 @@ void Decode(HuffmanTree HT, int n, char *code) {
         }
         if (HT[p].lchild == 0 && HT[p].rchild == 0) {
             // 叶子结点
-            printf("%c", (char)HT[p].weight);  // 假设权值就是ASCII码
+            printf("%c", HT[p].ch);  // 修改：输出字符
             p = root;
         }
     }
@@ -178,8 +190,8 @@ int main() {
     HuffmanTree HT;
     HuffmanCode HC;
     
-    // 构建哈夫曼树
-    HuffmanCoding(HT, HC, w, n);
+    // 构建哈夫曼树（传入 chars）
+    HuffmanCoding(HT, HC, w, chars, n);
     
     // 打印哈夫曼树
     PrintHuffmanTree(HT, n);
@@ -192,7 +204,7 @@ int main() {
     Encode(HC, n, chars, text);
     
     // 解码测试
-    char code[] = "101101100010";
+    char code[] = "111000011010";
     Decode(HT, n, code);
     
     printf("\n");
