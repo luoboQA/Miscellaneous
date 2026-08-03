@@ -14,17 +14,49 @@
  * 
  * 树状数组示例（原数组：[1, 3, 5, 7, 9, 11, 13, 15]）
  * 
- * 树状数组构建（下标从1开始）：
- *   tree[1] = arr[1] = 1
- *   tree[2] = arr[1] + arr[2] = 1 + 3 = 4
- *   tree[3] = arr[3] = 5
- *   tree[4] = arr[1] + arr[2] + arr[3] + arr[4] = 1+3+5+7 = 16
- *   tree[5] = arr[5] = 9
- *   tree[6] = arr[5] + arr[6] = 9 + 11 = 20
- *   tree[7] = arr[7] = 13
- *   tree[8] = arr[1] + ... + arr[8] = 1+3+5+7+9+11+13+15 = 64
+ * 注意：C++ 代码中 arr 下标从 0 开始，tree 下标从 1 开始
+ * 
+ * 树状数组构建：
+ *   tree[1] = arr[0] = 1
+ *   tree[2] = arr[0] + arr[1] = 1 + 3 = 4
+ *   tree[3] = arr[2] = 5
+ *   tree[4] = arr[0] + arr[1] + arr[2] + arr[3] = 1+3+5+7 = 16
+ *   tree[5] = arr[4] = 9
+ *   tree[6] = arr[4] + arr[5] = 9 + 11 = 20
+ *   tree[7] = arr[6] = 13
+ *   tree[8] = arr[0] + arr[1] + arr[2] + arr[3] + arr[4] + arr[5] + arr[6] + arr[7] = 64
  * 
  * tree数组： [1, 4, 5, 16, 9, 20, 13, 64]
+ *          （下标从1开始，tree[0]不用）
+ * 
+ * 
+  * 树状数组逻辑结构（tree 下标从 1 开始，arr 下标从 0 开始）：
+ *
+ *                          tree[8]
+ *                         [1, 8]
+ *                        /      \
+ *                   tree[4]    tree[6]
+ *                  [1, 4]     [5, 6]
+ *                 /      \    /      \
+ *            tree[2]  tree[3] tree[5] tree[7]
+ *           [1, 2]   [3, 3]  [5, 5]  [7, 7]
+ *           /     \
+ *      tree[1]   (无)
+ *     [1, 1]
+ *
+ * 对应关系（arr 下标从 0 开始）：
+ *   tree[1] 覆盖 arr[0]                 → [1, 1]
+ *   tree[2] 覆盖 arr[0] + arr[1]        → [1, 2]
+ *   tree[3] 覆盖 arr[2]                 → [3, 3]
+ *   tree[4] 覆盖 arr[0] + arr[1] + arr[2] + arr[3] → [1, 4]
+ *   tree[5] 覆盖 arr[4]                 → [5, 5]
+ *   tree[6] 覆盖 arr[4] + arr[5]        → [5, 6]
+ *   tree[7] 覆盖 arr[6]                 → [7, 7]
+ *   tree[8] 覆盖 arr[0] 到 arr[7]       → [1, 8]
+ * 注意：
+ *   图中 [l, r] 表示该 tree 节点覆盖原数组 arr[l..r] 的区间和
+ *   这里的 l, r 是 0-based 下标
+ *   [1, 1] 表示 tree[1] 覆盖的是原数组的第 1 个位置（下标从 1 开始计数的第 1 个元素）
  * 
  * 前缀查询 Sum(7)：
  *   idx=7: result += tree[7]=13, idx -= lowbit(7)=1 → idx=6
@@ -68,7 +100,7 @@ typedef int ElemType;
  * @param original 原始数组
  * @param n       数组大小
  * 
- * @note 下标从1开始，0号位置不使用
+ * @note tree下标从1开始，0号位置不使用,因为lowbit(0) = 0 & -0 = 0,如果 idx=0，while (idx <= n) 会死循环
  */
 class FenwickTree {
 private:
@@ -102,10 +134,20 @@ public:
      * 
      * @note 时间复杂度 O(log n)
      */
+    
     void Add(int idx, int delta) {
         while (idx <= n) {
             tree[idx] += delta;
-            idx += idx & -idx;
+            idx += idx & -idx; 
+            /* lowbit(idx)  Add(3, 5) 变化 x=3 x=4 x=8
+            x=1  (001) → lowbit=1  (001)
+            x=2  (010) → lowbit=2  (010)
+            x=3  (011) → lowbit=1  (001)
+            x=4  (100) → lowbit=4  (100)
+            x=5  (101) → lowbit=1  (001)    
+            x=6  (110) → lowbit=2  (010)
+            x=7  (111) → lowbit=1  (001)
+            x=8  (1000) → lowbit=8 (1000)*/                 
         }
     }
     
