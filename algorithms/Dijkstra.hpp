@@ -96,19 +96,26 @@ typedef int ElemType;
  * 
  * @param graph 图的邻接矩阵（graph[i][j] 表示 i→j 的权重，0表示无边）
  * @param src   源点
+ * @param target 目标点（-1表示输出所有顶点，否则只输出到target的最短路径）
  * 
  * @note 时间复杂度 O(V²)，空间复杂度 O(V²)
  * @note 适用于稠密图
  * @note 不能处理负权边
- * @note 输出每个顶点的最短距离和路径
+ * @note 如果指定target，会在找到target后提前终止，提高效率
  */
-void Dijkstra_Matrix(vector<vector<int>> graph, int src) {
+void Dijkstra_Matrix(vector<vector<int>> graph, int src, int target = -1) {
     int n = graph.size();
     vector<int> dist(n, INF);
     vector<bool> visited(n, false);
     vector<int> parent(n, -1);
     
     dist[src] = 0;
+    
+    // 如果指定的target就是源点，直接返回结果
+    if (target == src) {
+        printf("起点%d → 终点%d: 最短距离 = 0 (源点即终点)\n", src, target);
+        return;
+    }
     
     for (int count = 0; count < n - 1; count++) {
         int u = -1;
@@ -120,7 +127,11 @@ void Dijkstra_Matrix(vector<vector<int>> graph, int src) {
             }
         }
         
-        if (u == -1) break;
+        if (u == -1 || dist[u] == INF) break;
+        
+        // 如果找到了目标点，提前终止
+        if (target != -1 && u == target) break;
+        
         visited[u] = true;
         
         for (int v = 0; v < n; v++) {
@@ -132,18 +143,48 @@ void Dijkstra_Matrix(vector<vector<int>> graph, int src) {
         }
     }
     
+    // 如果指定了目标点，只输出到目标点的最短路径
+    if (target != -1) {
+        printf("起点%d → 终点%d: ", src, target);
+        if (dist[target] == INF) {
+            printf("不可达\n");
+        } else {
+            printf("最短距离 = %d\n", dist[target]);
+            
+            // 输出路径
+            printf("路径: ");
+            vector<int> path;
+            for (int v = target; v != -1; v = parent[v]) {
+                path.push_back(v);
+            }
+            for (int j = path.size() - 1; j >= 0; j--) {
+                printf("%d", path[j]);
+                if (j > 0) printf("->");
+            }
+            printf("\n");
+        }
+        return;
+    }
+    
+    // 输出所有顶点的最短距离和路径
+    printf("起点: %d\n", src);
     printf("顶点\t距离\t路径\n");
     for (int i = 0; i < n; i++) {
-        printf("%d\t%d\t", i, dist[i]);
-        vector<int> path;
-        for (int v = i; v != -1; v = parent[v]) {
-            path.push_back(v);
+        printf("%d\t", i);
+        if (dist[i] == INF) {
+            printf("不可达\t-\n");
+        } else {
+            printf("%d\t", dist[i]);
+            vector<int> path;
+            for (int v = i; v != -1; v = parent[v]) {
+                path.push_back(v);
+            }
+            for (int j = path.size() - 1; j >= 0; j--) {
+                printf("%d", path[j]);
+                if (j > 0) printf("->");
+            }
+            printf("\n");
         }
-        for (int j = path.size() - 1; j >= 0; j--) {
-            printf("%d", path[j]);
-            if (j > 0) printf("->");
-        }
-        printf("\n");
     }
 }
 
@@ -168,13 +209,15 @@ typedef pair<int, int> PII;  // (距离, 顶点)
  * 
  * @param graph 图的邻接链表（graph[i] 存储从 i 出发的所有边）
  * @param src   源点
+ * @param target 目标点（-1表示输出所有顶点，否则只输出到target的最短路径）
  * 
  * @note 时间复杂度 O(E log V)，空间复杂度 O(V + E)
  * @note 适用于稀疏图
  * @note 使用优先队列（最小堆）优化选择最近顶点的过程
  * @note 不能处理负权边
+ * @note 如果指定target，会在找到target后提前终止，提高效率
  */
-void Dijkstra_List(vector<vector<Edge>> graph, int src) {
+void Dijkstra_List(vector<vector<Edge>> graph, int src, int target = -1) {
     int n = graph.size();
     vector<int> dist(n, INF);
     vector<int> parent(n, -1);
@@ -183,11 +226,21 @@ void Dijkstra_List(vector<vector<Edge>> graph, int src) {
     dist[src] = 0;
     pq.push({0, src});
     
+    // 如果指定的target就是源点，直接返回结果
+    if (target == src) {
+        printf("\n【优先队列优化版】\n");
+        printf("起点%d → 终点%d: 最短距离 = 0 (源点即终点)\n", src, target);
+        return;
+    }
+    
     while (!pq.empty()) {
         auto [d, u] = pq.top();
         pq.pop();
         
         if (d > dist[u]) continue;
+        
+        // 如果找到了目标点，提前终止
+        if (target != -1 && u == target) break;
         
         for (auto &edge : graph[u]) {
             int v = edge.to;
@@ -201,17 +254,48 @@ void Dijkstra_List(vector<vector<Edge>> graph, int src) {
     }
     
     printf("\n【优先队列优化版】\n");
+    
+    // 如果指定了目标点，只输出到目标点的最短路径
+    if (target != -1) {
+        printf("起点%d → 终点%d: ", src, target);
+        if (dist[target] == INF) {
+            printf("不可达\n");
+        } else {
+            printf("最短距离 = %d\n", dist[target]);
+            
+            // 输出路径
+            printf("路径: ");
+            vector<int> path;
+            for (int v = target; v != -1; v = parent[v]) {
+                path.push_back(v);
+            }
+            for (int j = path.size() - 1; j >= 0; j--) {
+                printf("%d", path[j]);
+                if (j > 0) printf("->");
+            }
+            printf("\n");
+        }
+        return;
+    }
+    
+    // 输出所有顶点的最短距离和路径
+    printf("起点: %d\n", src);
     printf("顶点\t距离\t路径\n");
     for (int i = 0; i < n; i++) {
-        printf("%d\t%d\t", i, dist[i]);
-        vector<int> path;
-        for (int v = i; v != -1; v = parent[v]) {
-            path.push_back(v);
+        printf("%d\t", i);
+        if (dist[i] == INF) {
+            printf("不可达\t-\n");
+        } else {
+            printf("%d\t", dist[i]);
+            vector<int> path;
+            for (int v = i; v != -1; v = parent[v]) {
+                path.push_back(v);
+            }
+            for (int j = path.size() - 1; j >= 0; j--) {
+                printf("%d", path[j]);
+                if (j > 0) printf("->");
+            }
+            printf("\n");
         }
-        for (int j = path.size() - 1; j >= 0; j--) {
-            printf("%d", path[j]);
-            if (j > 0) printf("->");
-        }
-        printf("\n");
     }
 }
