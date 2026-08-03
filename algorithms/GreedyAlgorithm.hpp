@@ -209,12 +209,13 @@ int MinKey(int key[], bool mstSet[]) {
  * @brief Prim算法求最小生成树
  * 
  * @param graph 图的邻接矩阵
+ * @param start 起始顶点
  * 
  * @note 时间复杂度 O(V²)，空间复杂度 O(V)
  * @note 贪心策略：每次选择到已选集合最近的顶点
  * @note 适用于稠密图
  */
-void PrimMST(int graph[V][V]) {
+void PrimMST(int graph[V][V], int start) {
     int parent[V];
     int key[V];
     bool mstSet[V];
@@ -224,8 +225,8 @@ void PrimMST(int graph[V][V]) {
         mstSet[i] = false;
     }
     
-    key[0] = 0;
-    parent[0] = -1;
+    key[start] = 0;        // 从指定顶点 start 开始
+    parent[start] = -1;    // 根节点没有父节点
     
     for (int count = 0; count < V - 1; count++) {
         int u = MinKey(key, mstSet);
@@ -239,26 +240,30 @@ void PrimMST(int graph[V][V]) {
         }
     }
     
-    printf("最小生成树（Prim算法）：\n");
+    printf("最小生成树（Prim算法，起点%d）：\n", start);
     printf("边\t权重\n");
-    for (int i = 1; i < V; i++) {
-        printf("%d-%d\t%d\n", parent[i], i, graph[i][parent[i]]);
+    for (int i = 0; i < V; i++) {
+        if (i != start) {
+            printf("%d-%d\t%d\n", parent[i], i, graph[i][parent[i]]);
+        }
     }
 }
 
 // ==================== 4. 最短路径（Dijkstra算法） ====================
 
 /**
- * @brief Dijkstra算法求单源最短路径
+ * @brief Dijkstra算法求单源最短路径（支持提前停止）
  * 
- * @param graph 图的邻接矩阵
- * @param src   源点
+ * @param graph  图的邻接矩阵
+ * @param src    源点（起点）
+ * @param target 目标点（终点），传入 -1 表示计算所有顶点
  * 
  * @note 时间复杂度 O(V²)，空间复杂度 O(V)
  * @note 贪心策略：每次选择距离最近的未访问顶点
  * @note 不能处理负权边
+ * @note 如果指定 target，找到后提前停止，提高效率
  */
-void Dijkstra(int graph[V][V], int src) {
+void Dijkstra(int graph[V][V], int src, int target) {
     int dist[V];
     bool visited[V];
     
@@ -271,20 +276,28 @@ void Dijkstra(int graph[V][V], int src) {
     
     for (int count = 0; count < V - 1; count++) {
         int u = MinKey(dist, visited);
+        
+        if (dist[u] == 99999) break;
+        if (u == target) break;
+        
         visited[u] = true;
         
         for (int v = 0; v < V; v++) {
-            if (!visited[v] && graph[u][v] && dist[u] != 99999 &&
-                dist[u] + graph[u][v] < dist[v]) {
+            if (!visited[v] && graph[u][v] && dist[u] + graph[u][v] < dist[v]) {
                 dist[v] = dist[u] + graph[u][v];
             }
         }
     }
     
-    printf("最短路径（Dijkstra算法，起点0）：\n");
-    printf("顶点\t距离\n");
+    if (target != -1) {
+        printf("起点%d → 终点%d %s\n", src, target,
+               dist[target] == 99999 ? "不可达" : to_string(dist[target]).c_str());
+        return;
+    }
+    
+    printf("起点%d\n顶点\t距离\n", src);
     for (int i = 0; i < V; i++) {
-        printf("%d\t%d\n", i, dist[i]);
+        printf("%d\t%s\n", i, dist[i] == 99999 ? "不可达" : to_string(dist[i]).c_str());
     }
 }
 
