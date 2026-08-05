@@ -164,7 +164,7 @@ Status CreateMGraph(MGraph &G) {
         scanf("%d %d", &vi, &vj);
         int i = LocateVex(G, vi);
         int j = LocateVex(G, vj);
-        G.arcs[i][j] = 1;
+        G.arcs[i][j] = 1; // 有向图只要设置 G.arcs[i][j] = 1
         G.arcs[j][i] = 1;
     }
     return OK;
