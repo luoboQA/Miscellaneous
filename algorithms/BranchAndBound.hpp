@@ -236,26 +236,29 @@ int BranchAndBound(vector<Item> &items, int capacity) {
     pq.push(root);
     
     int maxProfit = 0;
-    Node *bestNode = nullptr;
     
     while (!pq.empty()) {
         Node *u = pq.top();
         pq.pop();
         
+        // 剪枝
         if (u->bound <= maxProfit) {
+            delete u;
             continue;
         }
         
+        // 叶子节点
         if (u->level == n - 1) {
             if (u->profit > maxProfit) {
                 maxProfit = u->profit;
-                bestNode = u;
             }
+            delete u;
             continue;
         }
         
         int nextLevel = u->level + 1;
         
+        // 左子节点：选
         if (u->weight + items[nextLevel].weight <= capacity) {
             Node *left = new Node(*u, n);
             left->level = nextLevel;
@@ -266,18 +269,24 @@ int BranchAndBound(vector<Item> &items, int capacity) {
             
             if (left->bound > maxProfit) {
                 pq.push(left);
+            } else {
+                delete left;
             }
         }
         
+        // 右子节点：不选
         Node *right = new Node(*u, n);
         right->level = nextLevel;
         right->bound = Bound(*right, n, capacity, items);
         
         if (right->bound > maxProfit) {
             pq.push(right);
+        } else {
+            delete right;
         }
+        
+        delete u;
     }
     
-    delete root;
     return maxProfit;
 }
