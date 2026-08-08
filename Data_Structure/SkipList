@@ -1,0 +1,566 @@
+// SkipList.hpp
+#ifndef SKIP_LIST_HPP
+#define SKIP_LIST_HPP
+
+/**
+ * @brief 跳表模板（概率型有序数据结构）
+ * @tparam T 元素类型（必须支持比较操作符 < 和 ==）
+ * 
+ * 时间复杂度：
+ * - 查找：O(log n) 期望
+ * - 插入：O(log n) 期望
+ * - 删除：O(log n) 期望
+ * - 空间复杂度：O(n) 期望
+ * 
+ * 特性：
+ * - 自动维护有序性
+ * - 不支持重复元素（键值唯一）
+ * - 支持范围查询
+ */
+template<typename T>
+class SkipList {
+private:
+    // 节点结构
+    struct Node {
+        T data;
+        std::vector<Node*> next;  // 各层指针
+        
+        Node(const T& val, int level) : data(val), next(level, nullptr) {}
+        Node(T&& val, int level) : data(std::move(val)), next(level, nullptr) {}
+    };
+    
+    Node* _head;              // 头节点（哨兵）
+    int _maxLevel;           // 当前最大层数
+    const int _maxAllowedLevel; // 最大允许层数
+    std::size_t _size;       // 元素个数
+    double _probability;     // 提升概率 (通常为 0.5)
+    mutable std::mt19937 _rng; // 随机数生成器
+    std::uniform_real_distribution<double> _dist;
+    
+    /**
+     * @brief 随机生成层数
+     * @return 生成的层数 (1 ~ maxAllowedLevel)
+     */
+    int randomLevel() const {
+        int level = 1;
+        while (level < _maxAllowedLevel && _dist(_rng) < _probability) {
+            ++level;
+        }
+        return level;
+    }
+    
+    /**
+     * @brief 获取节点的层数
+     */
+    int nodeLevel(const Node* node) const {
+        return static_cast<int>(node->next.size());
+    }
+    
+    /**
+     * @brief 查找指定元素的前驱节点（所有层）
+     * @param val 要查找的值
+     * @param update 输出参数，存储各层的前驱节点
+     * @return 如果找到元素，返回该节点；否则返回 nullptr
+     */
+    Node* findPrevNodes(const T& val, std::vector<Node*>& update) const {
+        Node* current = _head;
+        update.assign(_maxLevel, nullptr);
+        
+        // 从最高层开始向下搜索
+        for (int i = _maxLevel - 1; i >= 0; --i) {
+            while (current->next[i] && current->next[i]->data < val) {
+                current = current->next[i];
+            }
+            update[i] = current;
+        }
+        
+        // 检查下一节点是否为目标值
+        if (current->next[0] && current->next[0]->data == val) {
+            return current->next[0];
+        }
+        return nullptr;
+    }
+
+public:
+    // ---- 构造函数 ----
+    
+    /**
+     * @brief 默认构造函数
+     * @param maxAllowedLevel 最大允许层数
+     * @param probability 提升概率 (0.0 ~ 1.0)
+     */
+    explicit SkipList(int maxAllowedLevel = 16, double probability = 0.5)
+        : _maxLevel(1), _maxAllowedLevel(maxAllowedLevel), 
+          _size(0), _probability(probability),
+          _rng(std::random_device{}()), _dist(0.0, 1.0) {
+        if (maxAllowedLevel < 1) {
+            throw std::invalid_argument("maxAllowedLevel must be at least 1");
+        }
+        if (probability <= 0.0 || probability >= 1.0) {
+            throw std::invalid_argument("probability must be in (0, 1)");
+        }
+        _head = new Node(T{}, maxAllowedLevel);
+    }
+    
+    /**
+     * @brief 从初始化列表构造
+     */
+    SkipList(std::initializer_list<T> ilist, int maxAllowedLevel = 16, double probability = 0.5)
+        : SkipList(maxAllowedLevel, probability) {
+        for (const T& val : ilist) {
+            insert(val);
+        }
+    }
+    
+    /**
+     * @brief 从迭代器范围构造
+     */
+    template<typename InputIt>
+    SkipList(InputIt first, InputIt last, int maxAllowedLevel = 16, double probability = 0.5)
+        : SkipList(maxAllowedLevel, probability) {
+        for (auto it = first; it != last; ++it) {
+            insert(*it);
+        }
+    }
+    
+    // ---- 析构函数 ----
+    
+    ~SkipList() {
+        clear();
+        delete _head;
+    }
+    
+    // ---- 拷贝控制 ----
+    
+    SkipList(const SkipList& other)
+        : _maxLevel(other._maxLevel), 
+          _maxAllowedLevel(other._maxAllowedLevel),
+          _size(0), _probability(other._probability),
+          _rng(std::random_device{}()), _dist(0.0, 1.0) {
+        _head = new Node(T{}, _maxAllowedLevel);
+        
+        // 遍历 other 并插入所有元素
+        for (auto it = other.begin(); it != other.end(); ++it) {
+            insert(*it);
+        }
+    }
+    
+    SkipList(SkipList&& other) noexcept
+        : _head(other._head), _maxLevel(other._maxLevel),
+          _maxAllowedLevel(other._maxAllowedLevel),
+          _size(other._size), _probability(other._probability),
+          _rng(std::move(other._rng)), _dist(0.0, 1.0) {
+        other._head = nullptr;
+        other._size = 0;
+        other._maxLevel = 1;
+    }
+    
+    SkipList& operator=(const SkipList& other) {
+        if (this != &other) {
+            SkipList tmp(other);
+            swap(tmp);
+        }
+        return *this;
+    }
+    
+    SkipList& operator=(SkipList&& other) noexcept {
+        if (this != &other) {
+            clear();
+            delete _head;
+            _head = other._head;
+            _maxLevel = other._maxLevel;
+            _size = other._size;
+            _probability = other._probability;
+            _rng = std::move(other._rng);
+            other._head = nullptr;
+            other._size = 0;
+            other._maxLevel = 1;
+        }
+        return *this;
+    }
+    
+    void swap(SkipList& other) noexcept {
+        std::swap(_head, other._head);
+        std::swap(_maxLevel, other._maxLevel);
+        std::swap(_size, other._size);
+        std::swap(_probability, other._probability);
+        std::swap(_rng, other._rng);
+    }
+    
+    // ---- 容量 ----
+    
+    std::size_t size() const { return _size; }
+    bool empty() const { return _size == 0; }
+    int maxLevel() const { return _maxLevel; }
+    
+    // ---- 查找 ----
+    
+    /**
+     * @brief 查找元素
+     * @param val 要查找的值
+     * @return 如果找到返回 true，否则 false
+     */
+    bool contains(const T& val) const {
+        Node* current = _head;
+        
+        for (int i = _maxLevel - 1; i >= 0; --i) {
+            while (current->next[i] && current->next[i]->data < val) {
+                current = current->next[i];
+            }
+        }
+        
+        return current->next[0] && current->next[0]->data == val;
+    }
+    
+    /**
+     * @brief 查找元素并返回引用（如果存在）
+     * @throws std::out_of_range 如果元素不存在
+     */
+    const T& find(const T& val) const {
+        Node* current = _head;
+        
+        for (int i = _maxLevel - 1; i >= 0; --i) {
+            while (current->next[i] && current->next[i]->data < val) {
+                current = current->next[i];
+            }
+        }
+        
+        if (current->next[0] && current->next[0]->data == val) {
+            return current->next[0]->data;
+        }
+        throw std::out_of_range("Element not found");
+    }
+    
+    /**
+     * @brief 查找小于等于 val 的最大元素
+     * @return 如果存在返回 true，否则 false
+     */
+    bool findFloor(const T& val, T& result) const {
+        Node* current = _head;
+        
+        for (int i = _maxLevel - 1; i >= 0; --i) {
+            while (current->next[i] && current->next[i]->data <= val) {
+                current = current->next[i];
+            }
+        }
+        
+        if (current != _head) {
+            result = current->data;
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * @brief 查找大于等于 val 的最小元素
+     * @return 如果存在返回 true，否则 false
+     */
+    bool findCeil(const T& val, T& result) const {
+        Node* current = _head;
+        
+        for (int i = _maxLevel - 1; i >= 0; --i) {
+            while (current->next[i] && current->next[i]->data < val) {
+                current = current->next[i];
+            }
+        }
+        
+        if (current->next[0]) {
+            result = current->next[0]->data;
+            return true;
+        }
+        return false;
+    }
+    
+    // ---- 插入 ----
+    
+    /**
+     * @brief 插入元素（如果已存在则不插入）
+     * @param val 要插入的值
+     * @return 如果插入成功返回 true，否则 false
+     */
+    bool insert(const T& val) {
+        std::vector<Node*> update(_maxAllowedLevel, nullptr);
+        Node* exists = findPrevNodes(val, update);
+        
+        if (exists) {
+            return false; // 元素已存在
+        }
+        
+        // 随机生成新节点的层数
+        int newLevel = randomLevel();
+        if (newLevel > _maxLevel) {
+            // 扩展头节点的指针
+            _head->next.resize(newLevel, nullptr);
+            for (int i = _maxLevel; i < newLevel; ++i) {
+                update[i] = _head;
+            }
+            _maxLevel = newLevel;
+        }
+        
+        // 创建新节点
+        Node* newNode = new Node(val, newLevel);
+        
+        // 插入到各层
+        for (int i = 0; i < newLevel; ++i) {
+            newNode->next[i] = update[i]->next[i];
+            update[i]->next[i] = newNode;
+        }
+        
+        ++_size;
+        return true;
+    }
+    
+    /**
+     * @brief 插入右值引用版本
+     */
+    bool insert(T&& val) {
+        std::vector<Node*> update(_maxAllowedLevel, nullptr);
+        Node* exists = findPrevNodes(val, update);
+        
+        if (exists) {
+            return false;
+        }
+        
+        int newLevel = randomLevel();
+        if (newLevel > _maxLevel) {
+            _head->next.resize(newLevel, nullptr);
+            for (int i = _maxLevel; i < newLevel; ++i) {
+                update[i] = _head;
+            }
+            _maxLevel = newLevel;
+        }
+        
+        Node* newNode = new Node(std::move(val), newLevel);
+        
+        for (int i = 0; i < newLevel; ++i) {
+            newNode->next[i] = update[i]->next[i];
+            update[i]->next[i] = newNode;
+        }
+        
+        ++_size;
+        return true;
+    }
+    
+    // ---- 删除 ----
+    
+    /**
+     * @brief 删除元素
+     * @param val 要删除的值
+     * @return 如果删除成功返回 true，否则 false
+     */
+    bool erase(const T& val) {
+        std::vector<Node*> update(_maxAllowedLevel, nullptr);
+        Node* toDelete = findPrevNodes(val, update);
+        
+        if (!toDelete) {
+            return false;
+        }
+        
+        int nodeLevel = nodeLevel(toDelete);
+        
+        // 从各层链表中移除
+        for (int i = 0; i < nodeLevel; ++i) {
+            update[i]->next[i] = toDelete->next[i];
+        }
+        
+        delete toDelete;
+        --_size;
+        
+        // 压缩层数
+        while (_maxLevel > 1 && !_head->next[_maxLevel - 1]) {
+            --_maxLevel;
+        }
+        _head->next.resize(_maxLevel);
+        
+        return true;
+    }
+    
+    /**
+     * @brief 删除最小元素
+     * @return 被删除的元素值
+     * @throws std::out_of_range 如果列表为空
+     */
+    T popMin() {
+        if (empty()) {
+            throw std::out_of_range("SkipList is empty");
+        }
+        T minVal = _head->next[0]->data;
+        erase(minVal);
+        return minVal;
+    }
+    
+    /**
+     * @brief 删除最大元素
+     * @return 被删除的元素值
+     * @throws std::out_of_range 如果列表为空
+     */
+    T popMax() {
+        if (empty()) {
+            throw std::out_of_range("SkipList is empty");
+        }
+        
+        // 找到最大元素
+        Node* current = _head;
+        for (int i = _maxLevel - 1; i >= 0; --i) {
+            while (current->next[i]) {
+                current = current->next[i];
+            }
+        }
+        T maxVal = current->data;
+        erase(maxVal);
+        return maxVal;
+    }
+    
+    /**
+     * @brief 清空所有元素
+     */
+    void clear() {
+        Node* current = _head->next[0];
+        while (current) {
+            Node* next = current->next[0];
+            delete current;
+            current = next;
+        }
+        
+        // 重置头节点
+        for (int i = 0; i < _maxLevel; ++i) {
+            _head->next[i] = nullptr;
+        }
+        _maxLevel = 1;
+        _size = 0;
+    }
+    
+    // ---- 范围查询 ----
+    
+    /**
+     * @brief 获取区间 [low, high] 内的所有元素
+     */
+    std::vector<T> rangeQuery(const T& low, const T& high) const {
+        std::vector<T> result;
+        if (low > high) return result;
+        
+        // 找到第一个 >= low 的节点
+        Node* current = _head;
+        for (int i = _maxLevel - 1; i >= 0; --i) {
+            while (current->next[i] && current->next[i]->data < low) {
+                current = current->next[i];
+            }
+        }
+        
+        current = current->next[0];
+        while (current && current->data <= high) {
+            result.push_back(current->data);
+            current = current->next[0];
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @brief 获取所有元素（有序）
+     */
+    std::vector<T> toVector() const {
+        std::vector<T> result;
+        result.reserve(_size);
+        Node* current = _head->next[0];
+        while (current) {
+            result.push_back(current->data);
+            current = current->next[0];
+        }
+        return result;
+    }
+    
+    // ---- 迭代器支持 ----
+    
+    class Iterator {
+    private:
+        Node* _node;
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = T*;
+        using reference = T&;
+        
+        explicit Iterator(Node* node = nullptr) : _node(node) {}
+        
+        T& operator*() { return _node->data; }
+        const T& operator*() const { return _node->data; }
+        T* operator->() { return &_node->data; }
+        const T* operator->() const { return &_node->data; }
+        
+        Iterator& operator++() {
+            if (_node) _node = _node->next[0];
+            return *this;
+        }
+        Iterator operator++(int) {
+            Iterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+        
+        bool operator==(const Iterator& other) const { return _node == other._node; }
+        bool operator!=(const Iterator& other) const { return _node != other._node; }
+    };
+    
+    class ConstIterator {
+    private:
+        const Node* _node;
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = const T*;
+        using reference = const T&;
+        
+        explicit ConstIterator(const Node* node = nullptr) : _node(node) {}
+        ConstIterator(const Iterator& it) : _node(it._node) {}
+        
+        const T& operator*() const { return _node->data; }
+        const T* operator->() const { return &_node->data; }
+        
+        ConstIterator& operator++() {
+            if (_node) _node = _node->next[0];
+            return *this;
+        }
+        ConstIterator operator++(int) {
+            ConstIterator tmp = *this;
+            ++(*this);
+            return tmp;
+        }
+        
+        bool operator==(const ConstIterator& other) const { return _node == other._node; }
+        bool operator!=(const ConstIterator& other) const { return _node != other._node; }
+    };
+    
+    Iterator begin() { return Iterator(_head->next[0]); }
+    Iterator end() { return Iterator(nullptr); }
+    ConstIterator begin() const { return ConstIterator(_head->next[0]); }
+    ConstIterator end() const { return ConstIterator(nullptr); }
+    ConstIterator cbegin() const { return ConstIterator(_head->next[0]); }
+    ConstIterator cend() const { return ConstIterator(nullptr); }
+    
+    // ---- 遍历 ----
+    
+    /**
+     * @brief 遍历所有元素
+     */
+    void forEach(std::function<void(const T&)> callback) const {
+        Node* current = _head->next[0];
+        while (current) {
+            callback(current->data);
+            current = current->next[0];
+        }
+    }
+    
+    // ---- 静态常量 ----
+    static constexpr std::size_t npos = static_cast<std::size_t>(-1);
+};
+
+// 非成员 swap
+template<typename T>
+void swap(SkipList<T>& a, SkipList<T>& b) noexcept {
+    a.swap(b);
+}
+
+#endif // SKIP_LIST_HPP
